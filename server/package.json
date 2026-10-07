@@ -1,0 +1,47 @@
+{
+  "name": "clyptus-api",
+  "version": "1.0.0",
+  "description": "Clyptus NestJS API",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "dev": "nest start --watch",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.1.2",
+    "@nestjs/config": "^12.0.1",
+    "@nestjs/core": "^12.1.2",
+    "@nestjs/jwt": "^12.0.2",
+    "@nestjs/platform-express": "^12.1.2",
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "cookie-parser": "^1.4.7",
+    "google-auth-library": "^11.1.0",
+    "mammoth": "^1.13.0",
+    "pdf-parse": "^2.4.5",
+    "prisma": "^5.22.0",
+    "reflect-metadata": "^0.2.0",
+    "resend": "^6.31.0",
+    "rxjs": "^7.6.2",
+    "word-extractor": "^1.0.4"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.8",
+    "@nestjs/schematics": "^12.0.6",
+    "@types/bcrypt": "^6.0.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^26.6.3",
+    "@types/word-extractor": "^1.0.6",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.0.0",
+    "typescript": "^5.8.3"
+  }
+}
