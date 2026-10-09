@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, FileText, LoaderCircle, UploadCloud, X } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, FileText, LoaderCircle, UploadCloud, X } from 'lucide-react'
 import logoImage from '../../assets/logo.png'
+import { StandOutSection } from '../../components/candidate/StandOutSection'
 import { useAuth } from '../../components/common/AuthContext'
 import { candidateService, type CandidateProfileResponse } from '../../services/candidateService'
 import { mapCandidateProfile } from '../../utils/candidateProfileMapper'
@@ -113,8 +114,10 @@ export function ResumeOnboardingPage() {
   const [file, setFile] = useState<File | null>(null)
   const [dragActive, setDragActive] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isCompletingOnboarding, setIsCompletingOnboarding] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadSuccess, setUploadSuccess] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -170,6 +173,7 @@ export function ResumeOnboardingPage() {
   const selectFile = (candidateFile?: File) => {
     if (!candidateFile) return
     setError('')
+    setUploadSuccess(false)
     const extension = candidateFile.name.split('.').pop()?.toLowerCase() ?? ''
     if (!acceptedExtensions.includes(extension) || (candidateFile.type && !acceptedMimeTypes.includes(candidateFile.type))) {
       setFile(null)
@@ -230,6 +234,10 @@ export function ResumeOnboardingPage() {
           setError('Add a professional headline and at least one preferred job role to continue.')
           return false
         }
+        if (roles.length > 3) {
+          setError('You can select up to 3 desired positions.')
+          return false
+        }
         const range = salaryRanges.find((item) => item.label === salaryRange)
         await candidateService.saveProfile({
           headline: headline.trim(),
@@ -255,9 +263,35 @@ export function ResumeOnboardingPage() {
     }
   }
 
+  const completeOnboarding = async () => {
+    if (isCompletingOnboarding) return
+    setIsCompletingOnboarding(true)
+    setError('')
+    try {
+      const response = await candidateService.saveProfile({ completeOnboarding: true })
+      if (!response.onboardingComplete) {
+        throw new Error('Onboarding could not be marked complete. Please try again.')
+      }
+      const refreshedUser = await refreshSession()
+      if (!refreshedUser || refreshedUser.onboardingComplete === false) {
+        throw new Error('Your session could not be refreshed. Please try again.')
+      }
+      navigate('/candidate/profile', { replace: true })
+    } catch (completionError) {
+      setError(completionError instanceof Error ? completionError.message : 'Could not complete onboarding. Please try again.')
+    } finally {
+      setIsCompletingOnboarding(false)
+    }
+  }
+
   const handleContinue = async () => {
     if (isLoadingProfile || isProcessing) return
     if (currentStep === 4) {
+      if (uploadSuccess) {
+        setCurrentStep(5)
+        return
+      }
+
       if (!file) {
         setError('Choose a resume to continue.')
         return
@@ -267,21 +301,20 @@ export function ResumeOnboardingPage() {
       setUploadProgress(0)
       try {
         const response = await candidateService.uploadResume(file, setUploadProgress)
-        if (response.status !== 'parsed' || !response.success) {
+        if (!response.success || response.status !== 'parsed' || response.resume.status !== 'PARSED') {
           setError(response.message || "We couldn't extract enough information from this resume. You can upload a clearer version.")
           return
         }
-        const profile = await candidateService.getProfile()
-        const parsedDraft = profile.profile.parsedResumeData ?? profile.latestResume?.parsedData
-        if (!parsedDraft) throw new Error('Your resume was parsed, but the review draft could not be loaded.')
-        const refreshedUser = await refreshSession()
-        if (!refreshedUser?.resumeReadyForReview) throw new Error('The parsed resume is saved, but the review session is not ready. Please retry.')
-        navigate('/candidate/profile', { replace: true })
+        setUploadSuccess(true)
       } catch (uploadError) {
         setError(getUploadError(uploadError))
       } finally {
         setIsProcessing(false)
       }
+      return
+    }
+    if (currentStep === 5) {
+      await completeOnboarding()
       return
     }
     if (await saveStep(currentStep)) setCurrentStep((step) => step + 1)
@@ -295,12 +328,25 @@ export function ResumeOnboardingPage() {
   const clearFile = () => {
     setFile(null)
     setError('')
+    setUploadSuccess(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const addRole = (value: string) => {
     const normalized = value.trim()
-    if (normalized && !roles.includes(normalized)) setRoles((items) => [...items, normalized])
+    if (!normalized) {
+      setRoleInput('')
+      return
+    }
+    if (roles.includes(normalized)) {
+      setRoleInput('')
+      return
+    }
+    if (roles.length >= 3) {
+      setError('You can select up to 3 desired positions.')
+      return
+    }
+    setRoles((items) => [...items, normalized])
     setRoleInput('')
   }
 
@@ -311,7 +357,7 @@ export function ResumeOnboardingPage() {
   }
 
   const yearOptions = Array.from({ length: 61 }, (_, index) => new Date().getFullYear() + 5 - index)
-  const stepTitles = ['Basic details', 'Education', 'Headline & preferences', 'Resume upload']
+  const stepTitles = ['Basic details', 'Education', 'Headline & preferences', 'Resume upload', 'Stand Out to Recruiters']
 
   return (
     <main className="min-h-screen bg-[#f7f7f5] text-slate-900">
@@ -320,13 +366,13 @@ export function ResumeOnboardingPage() {
           <img src={logoImage} alt="Clyptus" className="h-8 w-auto object-contain" />
           <div className="text-right">
             <p className="text-sm font-semibold">Candidate onboarding</p>
-            <p className="text-xs text-slate-500">Step {currentStep} of 4</p>
+            <p className="text-xs text-slate-500">Step {currentStep} of 5</p>
           </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-4xl px-4 py-7 sm:px-8 sm:py-10">
-        <ol className="mb-7 grid grid-cols-4 gap-2" aria-label="Onboarding progress">
+        <ol className="mb-7 grid grid-cols-5 gap-2" aria-label="Onboarding progress">
           {stepTitles.map((title, index) => {
             const step = index + 1
             const complete = step < currentStep
@@ -347,10 +393,10 @@ export function ResumeOnboardingPage() {
               <div className="mb-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-orange-700">Step {currentStep} · {stepTitles[currentStep - 1]}</p>
                 <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-                  {currentStep === 1 ? 'Tell us a little about yourself' : currentStep === 2 ? 'Add your education' : currentStep === 3 ? 'Set your job preferences' : 'Upload your resume'}
+                  {currentStep === 1 ? 'Tell us a little about yourself' : currentStep === 2 ? 'Add your education' : currentStep === 3 ? 'Set your job preferences' : currentStep === 4 ? 'Upload your resume' : '5. Stand Out to Recruiters'}
                 </h1>
                 <p className="mt-2 text-sm text-slate-600">
-                  {currentStep === 1 ? 'A few essential details help us create your candidate profile.' : currentStep === 2 ? 'Add your highest or current qualification.' : currentStep === 3 ? 'Help us understand the roles and opportunities you want.' : 'We’ll parse your resume into a draft for you to review before it becomes your profile.'}
+                  {currentStep === 1 ? 'A few essential details help us create your candidate profile.' : currentStep === 2 ? 'Add your highest or current qualification.' : currentStep === 3 ? 'Help us understand the roles and opportunities you want.' : currentStep === 4 ? 'We’ll parse your resume into a draft for you to review before it becomes your profile.' : 'Take an optional AI Video Interview or continue to your profile.'}
                 </p>
               </div>
 
@@ -439,9 +485,13 @@ export function ResumeOnboardingPage() {
                   <div>
                     <label htmlFor="role-search" className="text-sm font-medium">Preferred job roles <span className="text-red-600">*</span></label>
                     <div className="mt-1.5 flex gap-2">
-                      <input id="role-search" className={inputClass} list="candidate-roles" value={roleInput} onChange={(event) => setRoleInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addRole(roleInput) } }} placeholder="Search or add a role" />
+                      <input id="role-search" className={inputClass} list="candidate-roles" value={roleInput} onChange={(event) => setRoleInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addRole(roleInput) } }} placeholder="Search or add a role" disabled={roles.length >= 3} />
                       <datalist id="candidate-roles">{roleOptions.map((item) => <option key={item} value={item} />)}</datalist>
-                      <button type="button" onClick={() => addRole(roleInput)} className="rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-700">Add</button>
+                      <button type="button" onClick={() => addRole(roleInput)} disabled={roles.length >= 3} className="rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Add</button>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+                      <span>{roles.length}/3 selected</span>
+                      {roles.length >= 3 ? <span className="font-medium text-orange-700">You can select up to 3 desired positions.</span> : null}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {roles.map((role) => <button type="button" key={role} onClick={() => setRoles((items) => items.filter((item) => item !== role))} className="rounded-full bg-orange-50 px-3 py-1.5 text-xs font-medium text-orange-900">{role} <span aria-hidden="true">×</span></button>)}
@@ -509,6 +559,7 @@ export function ResumeOnboardingPage() {
                         {!isProcessing ? <button type="button" onClick={clearFile} aria-label="Remove selected resume" className="rounded-md p-2 text-slate-500 hover:bg-white"><X className="h-4 w-4" /></button> : null}
                       </div>
                       {isProcessing ? <div className="mt-4"><div className="flex items-center gap-2 text-sm text-slate-700"><LoaderCircle className="h-4 w-4 animate-spin" />Uploading and parsing resume ({uploadProgress}%)</div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full bg-orange-500 transition-all" style={{ width: `${uploadProgress}%` }} /></div></div> : null}
+                      {uploadSuccess && !isProcessing ? <div className="mt-4 flex items-center gap-2 text-sm font-medium text-green-700"><CheckCircle2 className="h-4 w-4" />Resume uploaded and parsed successfully!</div> : null}
                     </div>
                   )}
                   <p className="mt-4 text-sm leading-6 text-slate-600">After parsing, your information is shown as a draft. It will not replace your profile until you review and confirm it.</p>
@@ -521,14 +572,27 @@ export function ResumeOnboardingPage() {
                 </div>
               ) : null}
 
+              {currentStep === 5 ? (
+                <div className="space-y-4">
+                  <StandOutSection onboarding onSkip={() => void completeOnboarding()} onComplete={() => void completeOnboarding()} />
+                </div>
+              ) : null}
+
               {error ? <p role="alert" className="mt-5 rounded-lg bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</p> : null}
 
               <div className="mt-7 flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                {currentStep > 1 ? (
-                  <button type="button" onClick={handleBack} disabled={isProcessing} className="inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><ChevronLeft className="h-4 w-4" />Back</button>
-                ) : <span />}
-                <button type="button" onClick={() => void handleContinue()} disabled={isLoadingProfile || isProcessing} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60">
-                  {isProcessing ? <><LoaderCircle className="h-4 w-4 animate-spin" />Processing</> : currentStep === 4 ? <>Review profile <ChevronRight className="h-4 w-4" /></> : <>Continue <ChevronRight className="h-4 w-4" /></>}
+                <div className="flex items-center gap-3">
+                  {currentStep > 1 ? (
+                    <button type="button" onClick={handleBack} disabled={isProcessing} className="inline-flex h-10 items-center justify-center gap-1 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><ChevronLeft className="h-4 w-4" />Back</button>
+                  ) : <span />}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleContinue()}
+                  disabled={isLoadingProfile || isProcessing || isCompletingOnboarding || (currentStep === 4 && !file)}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isCompletingOnboarding ? <><LoaderCircle className="h-4 w-4 animate-spin" />Opening profile</> : isProcessing ? <><LoaderCircle className="h-4 w-4 animate-spin" />Processing</> : currentStep === 4 ? (uploadSuccess ? <>Next <ChevronRight className="h-4 w-4" /></> : <>Upload & process resume <ChevronRight className="h-4 w-4" /></>) : currentStep === 5 ? <>Go to Profile <ChevronRight className="h-4 w-4" /></> : <>Continue <ChevronRight className="h-4 w-4" /></>}
                 </button>
               </div>
             </>

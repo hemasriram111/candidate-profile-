@@ -51,7 +51,13 @@ export function RegisterPage() {
         confirmPassword: form.passwordConfirm,
         role: 'candidate',
       })
-      navigate(`/verify-email?email=${encodeURIComponent(result.email)}&cooldown=${result.resendCooldownSeconds}`, { replace: true })
+
+      if (result.requiresEmailVerification) {
+        navigate(`/verify-email?email=${encodeURIComponent(result.email)}&cooldown=${result.resendCooldownSeconds}`, { replace: true })
+        return
+      }
+
+      navigate('/candidate/profile', { replace: true })
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : 'Registration failed. Please try again.'
       setError(message)

@@ -65,6 +65,11 @@ export class AuthService {
     response.cookie('clyptus_session', token, this.getCookieOptions())
   }
 
+  private isEmailVerificationRequired() {
+    const value = this.configService.get<string>('EMAIL_VERIFICATION_REQUIRED', 'false').trim().toLowerCase()
+    return value !== 'false' && value !== '0' && value !== 'no' && value !== 'off' && value !== ''
+  }
+
   private sanitizeUser(user: any) {
     const role = typeof user.role === 'string' ? user.role.toLowerCase() : user.role
 
@@ -97,7 +102,8 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12)
-    const verification = this.createVerificationCode(email)
+    const emailVerificationRequired = this.isEmailVerificationRequired()
+    const verification = emailVerificationRequired ? this.createVerificationCode(email) : null
 
     try {
       await this.prisma.$transaction(async (transaction) => {
@@ -106,11 +112,11 @@ export class AuthService {
             email,
             name: fullName,
             passwordHash,
-            emailVerified: false,
-            verificationOtpHash: verification.hash,
-            verificationOtpExpiresAt: verification.expiresAt,
+            emailVerified: !emailVerificationRequired,
+            verificationOtpHash: emailVerificationRequired ? verification!.hash : null,
+            verificationOtpExpiresAt: emailVerificationRequired ? verification!.expiresAt : null,
             verificationOtpAttempts: 0,
-            verificationOtpLastSentAt: verification.sentAt,
+            verificationOtpLastSentAt: emailVerificationRequired ? verification!.sentAt : null,
             role: 'CANDIDATE',
             isActive: true,
           },
@@ -126,7 +132,10 @@ export class AuthService {
         await transaction.candidateProfile.create({
           data: { userId: user.id, resumeOnboardingComplete: false },
         })
-        await this.emailService.sendVerificationEmail({ email, name: fullName, otp: verification.otp })
+
+        if (emailVerificationRequired) {
+          await this.emailService.sendVerificationEmail({ email, name: fullName, otp: verification!.otp })
+        }
       }, { maxWait: 10_000, timeout: 30_000 })
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
@@ -136,10 +145,10 @@ export class AuthService {
     }
 
     return {
-      requiresEmailVerification: true,
+      requiresEmailVerification: emailVerificationRequired,
       email,
-      message: 'Verification code sent to your email.',
-      resendCooldownSeconds: VERIFICATION_RESEND_COOLDOWN_MS / 1000,
+      message: emailVerificationRequired ? 'Verification code sent to your email.' : 'Account created successfully.',
+      resendCooldownSeconds: emailVerificationRequired ? VERIFICATION_RESEND_COOLDOWN_MS / 1000 : 0,
     }
   }
 
@@ -156,7 +165,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.')
     }
 
-    if (!user.emailVerified) {
+    if (this.isEmailVerificationRequired() && !user.emailVerified) {
       throw new ForbiddenException({
         message: 'Please verify your email before signing in.',
         requiresEmailVerification: true,

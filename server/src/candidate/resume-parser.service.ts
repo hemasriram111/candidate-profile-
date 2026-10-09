@@ -65,10 +65,6 @@ export class ResumeParserService {
       .replace(/\n{3,}/g, '\n\n')
       .trim()
 
-    if (cleaned.length < 40) {
-      throw new BadRequestException("We couldn't extract enough information from this resume. Please upload a clearer version.")
-    }
-
     const lines = cleaned.split('\n').map((line) => line.trim()).filter(Boolean)
     const sections = this.extractSections(lines)
     const allUrls = cleaned.match(/(?:https?:\/\/|www\.)[^\s<>]+/gi)?.map((url) => url.replace(/[),.;]+$/, '')) ?? []
@@ -93,10 +89,6 @@ export class ResumeParserService {
       .split(/[\n,;|]+/)
       .map((value) => this.cleanValue(value))
       .filter(Boolean)
-
-    if (!summary && !skills.length && !education.length && !experience.length && !projects.length && !certifications.length) {
-      throw new BadRequestException("We couldn't extract enough information from this resume. Please upload a clearer version.")
-    }
 
     const linkedin = allUrls.find((url) => /linkedin\.com/i.test(url)) ?? null
     const github = allUrls.find((url) => /github\.com/i.test(url)) ?? null

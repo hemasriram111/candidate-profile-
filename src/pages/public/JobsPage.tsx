@@ -158,7 +158,7 @@ export function JobsPage() {
               </div>
             ) : (
               <>
-                <div className="job-grid two-column">
+                <div className="job-grid three-column">
                   {results.items.map((job) => <JobCard key={job.id} job={job} />)}
                 </div>
                 {results.totalPages > 1 ? (

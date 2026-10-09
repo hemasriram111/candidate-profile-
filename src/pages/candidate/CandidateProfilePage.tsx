@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Camera, FileText, MapPin, Pencil, Plus, X } from 'lucide-react'
 import { Button } from '../../components/ui/button'
 import { ProfileSection } from '../../components/candidate/ProfileSection'
+import { StandOutSection } from '../../components/candidate/StandOutSection'
 import { useAuth } from '../../components/common/AuthContext'
 import { candidateService, type CandidateProfileResponse, type CandidateProfileUpdate, type ParsedResumeData } from '../../services/candidateService'
 import type { CandidateEducation, CandidateExperience, CandidateProfile, CandidateProject } from '../../types/candidate.types'
@@ -445,6 +446,7 @@ export function CandidateProfilePage() {
         ) : null}
       </header>
 
+
       <EditableSection title="About" editing={isSectionEditing('about')} onEdit={editButton('about')} onSave={() => void saveProfile('about')} onCancel={cancelEditing} saving={isSaving} showActions={editingSection !== 'all'}>
         {isSectionEditing('about') ? <div className="space-y-3">
           {simpleField('Professional headline', profile.headline, (value) => updateProfile((current) => ({ ...current, headline: value })))}
@@ -652,6 +654,10 @@ export function CandidateProfilePage() {
           <div className="flex min-w-0 flex-1 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3"><FileText className="h-5 w-5 shrink-0 text-orange-700" /><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{profile.resume.fileName}</p><p className="mt-0.5 text-xs text-slate-500">{profile.resume.fileType} {profile.resume.fileSize ? `· ${profile.resume.fileSize}` : ''} · Parsed</p></div></div><a className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50" href={candidateService.getResumeUrl()} target="_blank" rel="noreferrer">View resume</a><Link className="inline-flex h-9 items-center justify-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-700" to="/candidate/resume">Replace resume</Link>
         </div> : <p className="text-sm text-slate-500">No resume uploaded yet. <Link className="font-semibold text-orange-800 hover:underline" to="/candidate/resume">Upload a resume</Link>.</p>}
       </ProfileSection>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <StandOutSection />
+      </div>
 
       {editingSection === 'all' ? <div className="sticky bottom-3 z-10 flex flex-col-reverse gap-2 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" disabled={isSaving} onClick={cancelEditing}>Cancel</Button>

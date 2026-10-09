@@ -20,9 +20,30 @@ export function CandidateHeader({ onToggleMobileNav, mobileNavOpen }: CandidateH
   const { user, logout, isLoading } = useAuth()
   const navigate = useNavigate()
   const [searchOpen, setSearchOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [accountError, setAccountError] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownOpen && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    const handleEscape = (event: KeyboardEvent) => {
+      if (dropdownOpen && event.key === 'Escape') {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [dropdownOpen])
 
   useEffect(() => {
     if (searchOpen) searchInput.current?.focus()
@@ -122,29 +143,31 @@ export function CandidateHeader({ onToggleMobileNav, mobileNavOpen }: CandidateH
           >
             <Bell className="h-4 w-4" />
           </Link>
-          <details className="relative">
-            <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 p-1.5 pr-2.5 text-left hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+          <div className="relative" ref={dropdownRef}>
+            <button type="button" onClick={() => setDropdownOpen(!dropdownOpen)} className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 p-1.5 pr-2.5 text-left hover:bg-slate-50">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">{initials}</span>
               <span className="hidden max-w-32 truncate text-sm font-medium text-slate-800 sm:inline">{user?.name || 'My account'}</span>
               <ChevronDown className="hidden h-4 w-4 text-slate-500 sm:block" />
-            </summary>
-            <div className="absolute right-0 top-full z-50 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
-              <div className="border-b border-slate-100 px-3 py-2">
-                <p className="truncate text-sm font-semibold text-slate-900">{user?.name || 'Candidate'}</p>
-                <p className="truncate text-xs text-slate-500">{user?.email}</p>
+            </button>
+            {dropdownOpen && (
+              <div className="absolute right-0 top-full z-50 mt-2 w-60 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+                <div className="border-b border-slate-100 px-3 py-2">
+                  <p className="truncate text-sm font-semibold text-slate-900">{user?.name || 'Candidate'}</p>
+                  <p className="truncate text-xs text-slate-500">{user?.email}</p>
+                </div>
+                <Link to="/candidate/profile" onClick={() => setDropdownOpen(false)} className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  <UserRound className="h-4 w-4" /> Profile
+                </Link>
+                <Link to="/candidate/resume" onClick={() => setDropdownOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  <FileText className="h-4 w-4" /> Resume
+                </Link>
+                <button type="button" disabled={isLoading} onClick={() => { setDropdownOpen(false); void signOut(); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                  <LogOut className="h-4 w-4" /> {isLoading ? 'Signing out…' : 'Sign out'}
+                </button>
+                {accountError ? <p role="alert" className="px-3 py-2 text-xs text-red-700">{accountError}</p> : null}
               </div>
-              <Link to="/candidate/profile" className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <UserRound className="h-4 w-4" /> Profile
-              </Link>
-              <Link to="/candidate/resume" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                <FileText className="h-4 w-4" /> Resume
-              </Link>
-              <button type="button" disabled={isLoading} onClick={() => void signOut()} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-                <LogOut className="h-4 w-4" /> {isLoading ? 'Signing out…' : 'Sign out'}
-              </button>
-              {accountError ? <p role="alert" className="px-3 py-2 text-xs text-red-700">{accountError}</p> : null}
-            </div>
-          </details>
+            )}
+          </div>
         </div>
       </div>
 
